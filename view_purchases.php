@@ -1,0 +1,39 @@
+<?php
+session_start();
+require_once 'db_connect.php';
+require_once 'auth_check.php';
+require_once 'config.php';
+
+check_access('admin');
+
+$message = isset($_GET['message']) ? htmlspecialchars($_GET['message']) : '';
+$purchases = [];
+$sql = "SELECT p.purchase_id, p.purchase_date, p.total_amount, p.status, s.name AS supplier_name, u.username AS created_by, b.name as branch_name
+        FROM purchases p
+        JOIN suppliers s ON p.supplier_id = s.supplier_id
+        JOIN users u ON p.user_id = u.user_id
+        LEFT JOIN branches b ON p.branch_id = b.branch_id
+        ORDER BY p.purchase_id DESC";
+$res = $conn->query($sql);
+if ($res) { while ($row = $res->fetch_assoc()) $purchases[] = $row; $res->free(); }
+$conn->close();
+?>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>قائمة المشتريات</title>
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+<?php require_once 'includes/admin_header.php'; ?>
+<div class="container">
+<h2>📦 سجل المشتريات</h2>
+<?php if ($message): ?><div><?php echo $message; ?></div><?php endif; ?>
+<p><a href="add_purchase.php">➕ إضافة مشتريات</a></p>
+<?php if (!empty($purchases)): ?>
+<table border="1" cellpadding="8" style="border-collapse:collapse"><thead><tr><th>ID</th><th>التاريخ</th><th>المورّد</th><th>الفرع</th><th>المبلغ</th><th>المُدار</th><th>الحالة</th></tr></thead>
+<tbody><?php foreach ($purchases as $p): ?><tr><td><?php echo $p['purchase_id']; ?></td><td><?php echo $p['purchase_date']; ?></td><td><?php echo htmlspecialchars($p['supplier_name']); ?></td><td><?php echo htmlspecialchars($p['branch_name']); ?></td><td><?php echo number_format($p['total_amount'], 2); ?></td><td><?php echo htmlspecialchars($p['created_by']); ?></td><td><?php echo htmlspecialchars($p['status']); ?></td></tr><?php endforeach; ?></tbody></table>
+<?php else: ?><p>لا توجد مشتريات مسجلة حتى الآن.</p><?php endif; ?>
+</div>
+</body></html>
