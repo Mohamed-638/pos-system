@@ -19,6 +19,7 @@ header('Content-Type: application/json');
 $response = ['status' => 'error', 'message' => 'حدث خطأ غير متوقع.'];
 
 $current_user_id = $_SESSION['user_id'];
+$current_branch_id = $_SESSION['branch_id'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $response['message'] = 'طريقة الطلب غير مدعومة.';
@@ -51,13 +52,13 @@ $expense_date = date('Y-m-d H:i:s', strtotime($expense_date_str));
 
 // 3. إدراج المصروف في قاعدة البيانات
 try {
-$sql = "INSERT INTO expenditures (expense_date, description, amount, category, user_id) 
-VALUES (?, ?, ?, ?, ?)";
+$sql = "INSERT INTO expenditures (expense_date, description, amount, category, user_id, branch_id) 
+VALUES (?, ?, ?, ?, ?, ?)";
 
 $stmt = $conn->prepare($sql);
 
-// ربط المعاملات: s=expense_date, s=description, d=amount, s=category, i=user_id
-$stmt->bind_param("ssdsi", $expense_date, $description, $amount, $category, $current_user_id);
+// ربط المعاملات: s=expense_date, s=description, d=amount, s=category, i=user_id, i=branch_id
+$stmt->bind_param("ssdsii", $expense_date, $description, $amount, $category, $current_user_id, $current_branch_id);
 
 if ($stmt->execute()) {
 $response['status'] = 'success';

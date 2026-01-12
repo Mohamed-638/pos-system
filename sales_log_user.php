@@ -10,10 +10,18 @@ require_once 'config.php';
 check_access('cashier'); 
 
 $current_user_id = $_SESSION['user_id'];
+$current_branch_id = $_SESSION['branch_id'] ?? null;
 $filter_date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
 
-// 🟢 التعديل: إضافة شرط (AND status = 'completed') لضمان عرض واحتساب المبيعات المكتملة فقط.
-$where_clause = "DATE(sale_date) = '{$filter_date}' AND user_id = {$current_user_id} AND status = 'completed'";
+$conditions = ["DATE(sale_date) = ?", "user_id = ?", "status = 'completed'"];
+$params = [$filter_date, $current_user_id];
+$types = "si";
+if ($current_branch_id) {
+    $conditions[] = "branch_id = ?";
+    $params[] = $current_branch_id;
+    $types .= "i";
+}
+$where_clause = implode(" AND ", $conditions);
 
 // =========================================================
 // جلب سجلات المبيعات المكتملة
@@ -23,18 +31,26 @@ FROM sales
 WHERE {$where_clause}
 ORDER BY sale_id DESC";
 
-$result_sales_log = $conn->query($sql_sales_log);
+$stmt_sales_log = $conn->prepare($sql_sales_log);
+$stmt_sales_log->bind_param($types, ...$params);
+$stmt_sales_log->execute();
+$result_sales_log = $stmt_sales_log->get_result();
 $sales_records = [];
 if ($result_sales_log) {
 while($row = $result_sales_log->fetch_assoc()) {
 $sales_records[] = $row;
 }
 }
+$stmt_sales_log->close();
 
 // 🟢 التعديل: إحصائيات إجمالي مبيعات اليوزر المكتملة للتاريخ المحدد
 $sql_total_for_date = "SELECT SUM(total_amount) AS date_total FROM sales WHERE {$where_clause}";
-$result_total_for_date = $conn->query($sql_total_for_date);
+$stmt_total_for_date = $conn->prepare($sql_total_for_date);
+$stmt_total_for_date->bind_param($types, ...$params);
+$stmt_total_for_date->execute();
+$result_total_for_date = $stmt_total_for_date->get_result();
 $date_total = ($result_total_for_date && $row = $result_total_for_date->fetch_assoc()) ? $row['date_total'] : 0;
+$stmt_total_for_date->close();
 
 $conn->close();
 ?>
