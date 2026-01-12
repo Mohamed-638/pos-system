@@ -19,7 +19,7 @@ try {
     // 1. جلب تفاصيل البيع الرئيسية (مع اسم المستخدم)
     $stmt_sale = $conn->prepare("
         SELECT 
-            s.total_amount, s.payment_method, s.sale_date, u.username, s.branch_id, b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone
+            s.total_amount, s.payment_method, s.sale_date, u.username, s.branch_id, b.name AS branch_name, b.address AS branch_address, b.phone AS branch_phone, b.delivery_phone AS branch_delivery_phone, b.working_hours AS branch_working_hours
         FROM 
             sales s
         JOIN 
@@ -136,6 +136,8 @@ try {
             
                 <p class="center" style="font-size: 0.8em; margin: 2px 0;">' . (!empty($sale_details['branch_address']) ? htmlspecialchars($sale_details['branch_address']) : RESTAURANT_ADDRESS) . '</p>
                 <p class="center" style="font-size: 0.8em; margin: 2px 0;">هاتف: ' . (!empty($sale_details['branch_phone']) ? htmlspecialchars($sale_details['branch_phone']) : RESTAURANT_PHONE) . '</p>
+                ' . (empty($sale_details['branch_delivery_phone']) ? '' : '<p class="center" style="font-size: 0.8em; margin: 2px 0;">توصيل: ' . htmlspecialchars($sale_details['branch_delivery_phone']) . '</p>') . '
+                ' . (empty($sale_details['branch_working_hours']) ? '' : '<p class="center" style="font-size: 0.8em; margin: 2px 0;">دوام: ' . htmlspecialchars($sale_details['branch_working_hours']) . '</p>') . '
 
             <h4 class="center" style="margin-top: 10px; margin-bottom: 5px; font-size: 0.9em;">' . RESTAURANT_FOOTER_MESSAGE . '</h4>
         </div>

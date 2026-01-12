@@ -32,6 +32,8 @@ CREATE TABLE `branches` (
   `name` varchar(255) NOT NULL,
   `address` varchar(500) DEFAULT NULL,
   `phone` varchar(50) DEFAULT NULL,
+  `delivery_phone` varchar(50) DEFAULT NULL,
+  `working_hours` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -39,10 +41,10 @@ CREATE TABLE `branches` (
 -- Dumping data for table `branches`
 --
 
-INSERT INTO `branches` (`branch_id`, `name`, `address`, `phone`, `created_at`) VALUES
-(1, 'Main Branch', 'Main Address', '0000', '2025-12-12 09:36:50'),
-(2, 'مدني', 'الجزيرة مدني', '0930080008', '2025-12-12 09:44:45'),
-(3, 'الخرطوم', 'الخرطوم شارع المطار', '0922726412', '2025-12-12 09:53:24');
+INSERT INTO `branches` (`branch_id`, `name`, `address`, `phone`, `delivery_phone`, `working_hours`, `created_at`) VALUES
+(1, 'Main Branch', 'Main Address', '0000', NULL, NULL, '2025-12-12 09:36:50'),
+(2, 'مدني', 'الجزيرة مدني', '0930080008', NULL, NULL, '2025-12-12 09:44:45'),
+(3, 'الخرطوم', 'الخرطوم شارع المطار', '0922726412', NULL, NULL, '2025-12-12 09:53:24');
 
 -- --------------------------------------------------------
 
