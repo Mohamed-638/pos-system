@@ -13,6 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $output = '';
+$branch_id = $_SESSION['branch_id'] ?? null;
 
 try {
     // 1. جلب آخر 10 مبيعات: 🟢 التعديل: إضافة عمود status
@@ -28,12 +29,16 @@ try {
             sales s
         JOIN 
             users u ON s.user_id = u.user_id
+        WHERE (? IS NULL OR s.branch_id = ?)
         ORDER BY 
             s.sale_id DESC
         LIMIT 10
     ";
     
-    $result = $conn->query($sql);
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $branch_id, $branch_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
     if ($result === false) {
           throw new Exception("SQL Error: " . $conn->error);
@@ -95,6 +100,7 @@ try {
     } else {
         $output .= '<p style="text-align: center; color: #aaa;">لا توجد مبيعات مسجلة حتى الآن.</p>';
     }
+    $stmt->close();
 
 } catch (Exception $e) {
     error_log("Error loading last sales: " . $e->getMessage());

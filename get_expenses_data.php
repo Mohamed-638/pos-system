@@ -1,13 +1,18 @@
 <?php
 // get_expenses_data.php - لجلب قائمة المصروفات (للعرض في الواجهة الإدارية)
 
-require_once 'db_connect.php'; 
+session_start();
+require_once 'db_connect.php';
+require_once 'auth_check.php';
+
+check_access(['admin', 'cashier']);
 
 header('Content-Type: application/json');
 $response = ['status' => 'error', 'message' => 'حدث خطأ.', 'data' => []];
 
 $limit = isset($_GET['limit']) && is_numeric($_GET['limit']) ? (int)$_GET['limit'] : 10;
 $offset = isset($_GET['offset']) && is_numeric($_GET['offset']) ? (int)$_GET['offset'] : 0;
+$branch_id = $_SESSION['branch_id'] ?? null;
 
 try {
 // 1. جلب المصروفات بترتيب تنازلي حسب التاريخ (الأحدث أولاً)
@@ -19,12 +24,13 @@ amount,
 category 
 FROM 
 expenditures 
+WHERE (? IS NULL OR branch_id = ?)
 ORDER BY 
 expense_date DESC
 LIMIT ? OFFSET ?";
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("ii", $limit, $offset);
+$stmt->bind_param("iiii", $branch_id, $branch_id, $limit, $offset);
 $stmt->execute();
 $result = $stmt->get_result();
 
