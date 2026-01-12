@@ -11,11 +11,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $address = trim($_POST['address'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
+    $delivery_phone = trim($_POST['delivery_phone'] ?? '');
+    $working_hours = trim($_POST['working_hours'] ?? '');
     if (empty($name)) {
         $message = 'اسم الفرع مطلوب.';
     } else {
-        $stmt = $conn->prepare("INSERT INTO branches (name, address, phone) VALUES (?, ?, ?)");
-        $stmt->bind_param('sss', $name, $address, $phone);
+        $stmt = $conn->prepare("INSERT INTO branches (name, address, phone, delivery_phone, working_hours) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param('sssss', $name, $address, $phone, $delivery_phone, $working_hours);
         if ($stmt->execute()) {
             header('Location: view_branches.php?message=' . urlencode('تمت إضافة الفرع.'));
             exit;
@@ -47,6 +49,10 @@ $conn->close();
     <input name="address">
     <label>الهاتف</label>
     <input name="phone">
+    <label>هاتف التوصيل</label>
+    <input name="delivery_phone">
+    <label>دوام العمل</label>
+    <input name="working_hours" placeholder="مثال: 09:00 - 23:00">
     <button type="submit">حفظ</button>
 </form>
 <p><a href="view_branches.php">عرض الفروع</a></p>

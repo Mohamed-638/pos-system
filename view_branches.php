@@ -6,7 +6,7 @@ require_once 'config.php';
 check_access('admin');
 $message = isset($_GET['message']) ? htmlspecialchars($_GET['message']) : '';
 $branches = [];
-$res = $conn->query("SELECT branch_id, name, address, phone FROM branches ORDER BY branch_id DESC");
+$res = $conn->query("SELECT branch_id, name, address, phone, delivery_phone, working_hours FROM branches ORDER BY branch_id DESC");
 if ($res) { while ($r = $res->fetch_assoc()) $branches[] = $r; $res->free(); }
 $conn->close();
 ?>
@@ -25,8 +25,8 @@ $conn->close();
 <p><a class="btn" href="add_branch.php">➕ إضافة فرع</a></p>
 <?php if (!empty($branches)): ?>
 <table class="table" border='1' cellpadding='6' style='border-collapse:collapse'>
-<thead><tr><th>ID</th><th>الاسم</th><th>العنوان</th><th>هاتف</th></tr></thead>
-<tbody><?php foreach($branches as $b): ?><tr><td><?php echo $b['branch_id']; ?></td><td><?php echo htmlspecialchars($b['name']); ?></td><td><?php echo htmlspecialchars($b['address']); ?></td><td><?php echo htmlspecialchars($b['phone']); ?></td></tr><?php endforeach; ?></tbody></table>
+<thead><tr><th>ID</th><th>الاسم</th><th>العنوان</th><th>هاتف</th><th>هاتف التوصيل</th><th>دوام العمل</th></tr></thead>
+<tbody><?php foreach($branches as $b): ?><tr><td><?php echo $b['branch_id']; ?></td><td><?php echo htmlspecialchars($b['name']); ?></td><td><?php echo htmlspecialchars($b['address'] ?? '-'); ?></td><td><?php echo htmlspecialchars($b['phone'] ?? '-'); ?></td><td><?php echo htmlspecialchars($b['delivery_phone'] ?? '-'); ?></td><td><?php echo htmlspecialchars($b['working_hours'] ?? '-'); ?></td></tr><?php endforeach; ?></tbody></table>
 <?php else: ?><p>لا توجد فروع مسجلة.</p><?php endif; ?>
 </div>
 </body>

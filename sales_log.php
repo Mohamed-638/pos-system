@@ -6,34 +6,60 @@ require_once 'auth_check.php';
 
 check_access('admin');
 
+$branches = [];
+$branches_res = $conn->query("SELECT branch_id, name FROM branches ORDER BY name");
+if ($branches_res) {
+    while ($b = $branches_res->fetch_assoc()) {
+        $branches[] = $b;
+    }
+    $branches_res->free();
+}
+
 // تحديد التاريخ المراد عرضه (افتراضيًا: اليوم الحالي)
 $filter_date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+$branch_filter = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
 
 // إعداد شرط التصفية
-$where_clause = "DATE(sale_date) = '{$filter_date}'";
+$where_clause = "DATE(s.sale_date) = ?";
+$where_params = [$filter_date];
+$where_types = "s";
+if ($branch_filter) {
+    $where_clause .= " AND s.branch_id = ?";
+    $where_params[] = $branch_filter;
+    $where_types .= "i";
+}
 
 // =========================================================
 // 1. جلب سجلات المبيعات بناءً على التاريخ المحدد
 // =========================================================
-$sql_sales_log = "SELECT sale_id, total_amount, payment_method, sale_date 
-                  FROM sales 
+$sql_sales_log = "SELECT s.sale_id, s.total_amount, s.payment_method, s.sale_date, b.name AS branch_name
+                  FROM sales s
+                  LEFT JOIN branches b ON s.branch_id = b.branch_id
                   WHERE {$where_clause}
-                  ORDER BY sale_id DESC";
+                  ORDER BY s.sale_id DESC";
 
-$result_sales_log = $conn->query($sql_sales_log);
+$stmt_sales_log = $conn->prepare($sql_sales_log);
+$stmt_sales_log->bind_param($where_types, ...$where_params);
+$stmt_sales_log->execute();
+$result_sales_log = $stmt_sales_log->get_result();
 $sales_records = [];
 if ($result_sales_log) {
     while($row = $result_sales_log->fetch_assoc()) {
         $sales_records[] = $row;
     }
 }
+$stmt_sales_log->close();
 
 // =========================================================
 // 2. إحصائيات إجمالي المبيعات للتاريخ المحدد فقط
 // =========================================================
-$sql_total_for_date = "SELECT SUM(total_amount) AS date_total FROM sales WHERE {$where_clause}";
-$result_total_for_date = $conn->query($sql_total_for_date);
+$sql_total_for_date = "SELECT SUM(total_amount) AS date_total FROM sales s WHERE {$where_clause}";
+$stmt_total_for_date = $conn->prepare($sql_total_for_date);
+$stmt_total_for_date->bind_param($where_types, ...$where_params);
+$stmt_total_for_date->execute();
+$result_total_for_date = $stmt_total_for_date->get_result();
 $date_total = ($result_total_for_date && $row = $result_total_for_date->fetch_assoc()) ? $row['date_total'] : 0;
+$stmt_total_for_date->close();
 
 
 $conn->close();
@@ -75,6 +101,15 @@ $conn->close();
         <form method="GET" action="sales_log.php" class="filter-panel">
             <label for="date-filter">تصفية حسب التاريخ:</label>
             <input type="date" id="date-filter" name="date" value="<?php echo $filter_date; ?>">
+            <label for="branch-filter">الفرع:</label>
+            <select id="branch-filter" name="branch_id">
+                <option value="">كل الفروع</option>
+                <?php foreach ($branches as $branch): ?>
+                    <option value="<?php echo $branch['branch_id']; ?>" <?php echo ($branch_filter === (int)$branch['branch_id']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($branch['name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
             <button type="submit">عرض الإيصالات</button>
             <?php if ($filter_date != date('Y-m-d')): ?>
                 <a href="sales_log.php" style="color: #dc3545; font-weight: bold; text-decoration: none;">عرض اليوم</a>
@@ -92,6 +127,7 @@ $conn->close();
                     <th>رقم الفاتورة</th>
                     <th>التاريخ والوقت</th>
                     <th>طريقة الدفع</th>
+                    <th>الفرع</th>
                     <th>الإجمالي</th>
                     <th>إجراء</th>
                 </tr>
@@ -103,6 +139,7 @@ $conn->close();
                             <td>#<?php echo $sale['sale_id']; ?></td>
                             <td><?php echo date('Y-m-d H:i:s', strtotime($sale['sale_date'])); ?></td>
                             <td><?php echo ($sale['payment_method'] === 'cash') ? 'كاش 💵' : 'بنكي 💳'; ?></td>
+                            <td><?php echo htmlspecialchars($sale['branch_name'] ?? '-'); ?></td>
                             <td><?php echo number_format($sale['total_amount'], 2); ?> ج.س</td>
                             <td>
                                 <button onclick="reprintReceipt(<?php echo $sale['sale_id']; ?>)" 

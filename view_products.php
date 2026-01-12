@@ -11,23 +11,39 @@ check_access('admin');
 
 // جلب رسالة النظام من أي عملية سابقة (إضافة/تعديل/حذف)
 $message = isset($_GET['message']) ? htmlspecialchars($_GET['message']) : '';
+$branch_filter = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
+
+$branches = [];
+$branches_res = $conn->query("SELECT branch_id, name FROM branches ORDER BY name");
+if ($branches_res) {
+    while ($b = $branches_res->fetch_assoc()) {
+        $branches[] = $b;
+    }
+    $branches_res->free();
+}
 
 // ---------------------------------------------------
 // 1. جلب قائمة المنتجات
 // ---------------------------------------------------
 // 🛠️ تم تصحيح أسماء الأعمدة: استخدام 'stock' كـ quantity و 'active' كـ status
 $sql_products = "SELECT 
-                    product_id, 
-                    name, 
-                    price, 
-                    cost, 
-                    stock AS quantity,  /* اسم العمود الفعلي في DB هو 'stock' */
-                    active AS status,   /* اسم العمود الفعلي في DB هو 'active' (0 أو 1) */
-                    image_path 
-                 FROM products 
-                 ORDER BY product_id DESC";
+                    p.product_id, 
+                    p.name, 
+                    p.price, 
+                    p.cost, 
+                    p.stock AS quantity,  /* اسم العمود الفعلي في DB هو 'stock' */
+                    p.active AS status,   /* اسم العمود الفعلي في DB هو 'active' (0 أو 1) */
+                    p.image_path,
+                    b.name AS branch_name
+                 FROM products p
+                 LEFT JOIN branches b ON p.branch_id = b.branch_id
+                 WHERE (? IS NULL OR p.branch_id = ?)
+                 ORDER BY p.product_id DESC";
                  
-$result_products = $conn->query($sql_products);
+$stmt_products = $conn->prepare($sql_products);
+$stmt_products->bind_param("ii", $branch_filter, $branch_filter);
+$stmt_products->execute();
+$result_products = $stmt_products->get_result();
 
 $products = [];
 if ($result_products) {
@@ -37,6 +53,7 @@ if ($result_products) {
 } else {
     $message = "❌ حدث خطأ في جلب بيانات المنتجات: " . $conn->error;
 }
+$stmt_products->close();
 
 $conn->close();
 ?>
@@ -101,6 +118,19 @@ $conn->close();
             <a href="add_product.php" class="add-link">➕ إضافة منتج جديد</a>
         </div>
 
+        <form method="GET" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+            <label for="branch_id" style="font-weight: bold;">الفرع:</label>
+            <select id="branch_id" name="branch_id">
+                <option value="">كل الفروع</option>
+                <?php foreach ($branches as $branch): ?>
+                    <option value="<?php echo $branch['branch_id']; ?>" <?php echo ($branch_filter === (int)$branch['branch_id']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($branch['name']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit" class="action-btn" style="background-color: #007bff; color: white;">تصفية</button>
+        </form>
+
 
         <?php if ($message): 
             $class = (strpos($message, '❌') !== false || strpos($message, 'خطأ') !== false) ? 'error' : 'success';
@@ -115,6 +145,7 @@ $conn->close();
                         <th>#ID</th>
                         <th>الصورة</th>
                         <th>المنتج</th>
+                        <th>الفرع</th>
                         <th>سعر البيع (ج.س)</th>
                         <th>سعر التكلفة (ج.س)</th>
                         <th>المخزون</th>
@@ -151,6 +182,7 @@ $conn->close();
                         <td><?php echo $product['product_id']; ?></td>
                         <td><?php echo $image_tag; ?></td>
                         <td style="text-align: right; font-weight: bold;"><?php echo htmlspecialchars($product['name']); ?></td>
+                        <td><?php echo htmlspecialchars($product['branch_name'] ?? '-'); ?></td>
                         <td><?php echo number_format($product['price'], 2); ?></td>
                         <td><?php echo number_format($product['cost'], 2); ?></td>
                         <td>

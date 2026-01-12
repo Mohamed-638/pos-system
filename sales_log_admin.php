@@ -12,13 +12,32 @@ check_access('admin');
 // 🟢 1. جلب التاريخ المُحدد من النموذج (Query Parameter)
 // استخدام تاريخ اليوم كقيمة افتراضية إذا لم يتم تحديد تاريخ
 $filter_date = isset($_GET['filter_date']) ? $_GET['filter_date'] : date('Y-m-d');
+$branch_filter = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
+
+$branches = [];
+$branches_res = $conn->query("SELECT branch_id, name FROM branches ORDER BY name");
+if ($branches_res) {
+    while ($b = $branches_res->fetch_assoc()) {
+        $branches[] = $b;
+    }
+    $branches_res->free();
+}
 
 // تحديد الشروط بناءً على ما إذا كان هناك تاريخ محدد
-$where_clause = "";
+$conditions = [];
+$params = [];
+$types = "";
 if (!empty($filter_date)) {
-    // التأكد من أن التاريخ المدخل صحيح قبل استخدامه في الاستعلام
-    $where_clause = "WHERE DATE(s.sale_date) = ?";
+    $conditions[] = "DATE(s.sale_date) = ?";
+    $params[] = $filter_date;
+    $types .= "s";
 }
+if ($branch_filter) {
+    $conditions[] = "s.branch_id = ?";
+    $params[] = $branch_filter;
+    $types .= "i";
+}
+$where_clause = $conditions ? "WHERE " . implode(" AND ", $conditions) : "";
 
 // بناء الاستعلام الرئيسي (لجلب سجل المبيعات)
 $sql = "SELECT 
@@ -27,11 +46,14 @@ $sql = "SELECT
     s.total_amount, 
     s.payment_method,
     s.status,
-    u.username AS cashier_name
+    u.username AS cashier_name,
+    b.name AS branch_name
 FROM 
     sales s
 JOIN 
     users u ON s.user_id = u.user_id
+LEFT JOIN
+    branches b ON s.branch_id = b.branch_id
 {$where_clause}
 ORDER BY 
     s.sale_date DESC";
@@ -41,9 +63,8 @@ $sales_log = [];
 try {
     $stmt = $conn->prepare($sql);
     
-    // ربط القيمة إذا كان هناك شرط WHERE
-    if (!empty($filter_date)) {
-        $stmt->bind_param("s", $filter_date);
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
     }
     
     $stmt->execute();
@@ -58,14 +79,16 @@ try {
 
     // 🟢 2. حساب الإجمالي الكلي الصافي (مع تطبيق الفلتر)
     // حساب المبيعات المكتملة فقط
-    $sql_grand_total = "SELECT SUM(total_amount) AS net_total FROM sales s {$where_clause} AND s.status = 'completed'";
+    $total_conditions = $conditions;
+    $total_conditions[] = "s.status = 'completed'";
+    $total_where_clause = "WHERE " . implode(" AND ", $total_conditions);
+    $sql_grand_total = "SELECT SUM(total_amount) AS net_total FROM sales s {$total_where_clause}";
     
     $stmt_grand_total = $conn->prepare($sql_grand_total);
     $net_grand_total = 0;
 
-    // ربط القيمة للإجمالي الكلي
-    if (!empty($filter_date)) {
-        $stmt_grand_total->bind_param("s", $filter_date);
+    if (!empty($params)) {
+        $stmt_grand_total->bind_param($types, ...$params);
     }
 
     $stmt_grand_total->execute();
@@ -192,6 +215,15 @@ h2 { border-bottom: 2px solid #343a40; padding-bottom: 10px; color: #333; margin
 <form method="GET" class="filter-form">
     <label for="filter_date">تصفية حسب اليوم:</label>
     <input type="date" id="filter_date" name="filter_date" value="<?php echo htmlspecialchars($filter_date); ?>">
+    <label for="branch_id">الفرع:</label>
+    <select id="branch_id" name="branch_id">
+        <option value="">كل الفروع</option>
+        <?php foreach ($branches as $branch): ?>
+            <option value="<?php echo $branch['branch_id']; ?>" <?php echo ($branch_filter === (int)$branch['branch_id']) ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($branch['name']); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
     <button type="submit">تطبيق الفلتر</button>
 </form>
 
@@ -202,6 +234,7 @@ h2 { border-bottom: 2px solid #343a40; padding-bottom: 10px; color: #333; margin
 <th>رقم الإيصال</th>
 <th>التاريخ والوقت</th>
 <th>الموظف (الكاشير)</th>
+<th>الفرع</th>
 <th>طريقة الدفع</th>
 <th>الحالة</th>
 <th>المبلغ الإجمالي (ج.س)</th>
@@ -218,6 +251,7 @@ foreach ($sales_log as $sale):
 <td><?php echo $sale['sale_id']; ?></td>
 <td><?php echo $sale['sale_date']; ?></td>
 <td><?php echo htmlspecialchars($sale['cashier_name']); ?></td>
+<td><?php echo htmlspecialchars($sale['branch_name'] ?? '-'); ?></td>
 <td><?php echo htmlspecialchars($sale['payment_method']); ?></td>
 <td><?php echo $status_text; ?></td>
 <td class="total-col"><?php echo number_format($sale['total_amount'], 2); ?></td>
@@ -236,7 +270,7 @@ foreach ($sales_log as $sale):
 </tbody>
 <tfoot>
 <tr>
-<td colspan="5" style="text-align: left; font-weight: bold; font-size: 1.1em;">
+<td colspan="6" style="text-align: left; font-weight: bold; font-size: 1.1em;">
     الإجمالي الصافي للمبيعات المكتملة 
     <?php echo !empty($filter_date) ? "بتاريخ: " . htmlspecialchars($filter_date) : ""; ?>:
 </td>

@@ -3,12 +3,17 @@
 
 // 1. استعلام لجلب آخر 10 مبيعات
 // ملاحظة: يتم استخدام $conn من الملف الرئيسي pos_screen.php
+$branch_id = $_SESSION['branch_id'] ?? null;
 $sql = "SELECT sale_id, total_amount, payment_method, sale_date 
         FROM sales 
+        WHERE (? IS NULL OR branch_id = ?)
         ORDER BY sale_id DESC 
-        LIMIT 10"; // عرض آخر 10 فواتير
+        LIMIT 10";
 
-$result = $conn->query($sql);
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("ii", $branch_id, $branch_id);
+$stmt->execute();
+$result = $stmt->get_result();
 
 $last_sales = [];
 if ($result && $result->num_rows > 0) {
@@ -16,4 +21,5 @@ if ($result && $result->num_rows > 0) {
         $last_sales[] = $row;
     }
 }
+$stmt->close();
 ?>

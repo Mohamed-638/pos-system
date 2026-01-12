@@ -29,9 +29,11 @@ check_access(['admin', 'cashier']);
 $branch_name = null;
 $branch_address = null;
 $branch_phone = null;
+$branch_delivery_phone = null;
+$branch_working_hours = null;
 $branch_id = $_SESSION['branch_id'] ?? null;
 if ($branch_id) {
-    $stmt_b = $conn->prepare("SELECT name, address, phone FROM branches WHERE branch_id = ? LIMIT 1");
+    $stmt_b = $conn->prepare("SELECT name, address, phone, delivery_phone, working_hours FROM branches WHERE branch_id = ? LIMIT 1");
     if ($stmt_b) {
         $stmt_b->bind_param('i', $branch_id);
         $stmt_b->execute();
@@ -40,6 +42,8 @@ if ($branch_id) {
             $branch_name = $row_b['name'];
             $branch_address = $row_b['address'];
             $branch_phone = $row_b['phone'];
+            $branch_delivery_phone = $row_b['delivery_phone'];
+            $branch_working_hours = $row_b['working_hours'];
         }
         $stmt_b->close();
     }
@@ -47,11 +51,13 @@ if ($branch_id) {
 
 // fallback: load first branch if none provided
 if (!$branch_name) {
-    $res_fb = $conn->query("SELECT name, address, phone FROM branches ORDER BY branch_id LIMIT 1");
+    $res_fb = $conn->query("SELECT name, address, phone, delivery_phone, working_hours FROM branches ORDER BY branch_id LIMIT 1");
     if ($res_fb && $rf = $res_fb->fetch_assoc()) {
         $branch_name = $rf['name'] ?? null;
         $branch_address = $rf['address'] ?? null;
         $branch_phone = $rf['phone'] ?? null;
+        $branch_delivery_phone = $rf['delivery_phone'] ?? null;
+        $branch_working_hours = $rf['working_hours'] ?? null;
     }
 }
 
@@ -310,6 +316,14 @@ if (!$branch_name) {
         <?php echo RESTAURANT_NAME; ?>
         <?php if (!empty($branch_name)): ?>
             <span style="font-size: 0.85em; color: #f8f9fa; margin-right: 10px;">- <?php echo htmlspecialchars($branch_name); ?></span>
+        <?php endif; ?>
+        <?php if (!empty($branch_address) || !empty($branch_phone) || !empty($branch_delivery_phone) || !empty($branch_working_hours)): ?>
+            <span style="font-size: 0.7em; color: #f8f9fa; margin-right: 10px;">
+                <?php if (!empty($branch_address)): ?><?php echo htmlspecialchars($branch_address); ?><?php endif; ?>
+                <?php if (!empty($branch_phone)): ?> | هاتف: <?php echo htmlspecialchars($branch_phone); ?><?php endif; ?>
+                <?php if (!empty($branch_delivery_phone)): ?> | توصيل: <?php echo htmlspecialchars($branch_delivery_phone); ?><?php endif; ?>
+                <?php if (!empty($branch_working_hours)): ?> | دوام: <?php echo htmlspecialchars($branch_working_hours); ?><?php endif; ?>
+            </span>
         <?php endif; ?>
     </div>
 

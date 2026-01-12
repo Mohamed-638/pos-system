@@ -11,6 +11,25 @@ check_access('admin');
 
 $net_profit_data = [];
 $error_message = null;
+$branch_filter = isset($_GET['branch_id']) && $_GET['branch_id'] !== '' ? (int)$_GET['branch_id'] : null;
+
+$branches = [];
+$branches_res = $conn->query("SELECT branch_id, name FROM branches ORDER BY name");
+if ($branches_res) {
+    while ($b = $branches_res->fetch_assoc()) {
+        $branches[] = $b;
+    }
+    $branches_res->free();
+}
+$selected_branch_name = null;
+if ($branch_filter) {
+    foreach ($branches as $branch) {
+        if ((int)$branch['branch_id'] === $branch_filter) {
+            $selected_branch_name = $branch['name'];
+            break;
+        }
+    }
+}
 
 // تحديد الفترة الافتراضية للتقرير (مثلاً: آخر 30 يوماً)
 $end_date = date('Y-m-d 23:59:59');
@@ -30,12 +49,19 @@ try {
                     SUM(total_amount - total_cost) AS gross_profit
                   FROM sales 
                   WHERE sale_date BETWEEN ? AND ? AND status = 'completed'"; // 💡 نضمن أن تكون المبيعات مكتملة
+    if ($branch_filter) {
+        $sql_sales .= " AND branch_id = ?";
+    }
     
     $stmt_sales = $conn->prepare($sql_sales);
     if (!$stmt_sales) {
          throw new Exception("فشل في تحضير استعلام المبيعات: " . $conn->error);
     }
-    $stmt_sales->bind_param("ss", $start_date, $end_date);
+    if ($branch_filter) {
+        $stmt_sales->bind_param("ssi", $start_date, $end_date, $branch_filter);
+    } else {
+        $stmt_sales->bind_param("ss", $start_date, $end_date);
+    }
     $stmt_sales->execute();
     $result_sales = $stmt_sales->get_result()->fetch_assoc();
     $stmt_sales->close();
@@ -49,12 +75,19 @@ try {
                        SUM(amount) AS total_expenses
                      FROM expenditures 
                      WHERE expense_date BETWEEN ? AND ?";
+    if ($branch_filter) {
+        $sql_expenses .= " AND branch_id = ?";
+    }
                      
     $stmt_expenses = $conn->prepare($sql_expenses);
     if (!$stmt_expenses) {
          throw new Exception("فشل في تحضير استعلام المصروفات: " . $conn->error);
     }
-    $stmt_expenses->bind_param("ss", $start_date, $end_date);
+    if ($branch_filter) {
+        $stmt_expenses->bind_param("ssi", $start_date, $end_date, $branch_filter);
+    } else {
+        $stmt_expenses->bind_param("ss", $start_date, $end_date);
+    }
     $stmt_expenses->execute();
     $result_expenses = $stmt_expenses->get_result()->fetch_assoc();
     $stmt_expenses->close();
@@ -159,6 +192,17 @@ h1 { color: #6f42c1; text-align: center; margin-bottom: 30px; }
 <input type="date" id="end_date" name="end_date" 
  value="<?php echo date('Y-m-d', strtotime($end_date)); ?>" required>
 </div>
+<div style="flex-grow: 1;">
+<label for="branch_id">الفرع:</label>
+<select id="branch_id" name="branch_id">
+    <option value="">كل الفروع</option>
+    <?php foreach ($branches as $branch): ?>
+        <option value="<?php echo $branch['branch_id']; ?>" <?php echo ($branch_filter === (int)$branch['branch_id']) ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($branch['name']); ?>
+        </option>
+    <?php endforeach; ?>
+</select>
+</div>
 <button type="submit"><i class="fas fa-filter"></i> تصفية التقرير</button>
 </form>
 
@@ -168,6 +212,9 @@ h1 { color: #6f42c1; text-align: center; margin-bottom: 30px; }
 <span style="color: #007bff;"><?php echo date('Y/m/d', strtotime($start_date)); ?></span>
 إلى 
 <span style="color: #007bff;"><?php echo date('Y/m/d', strtotime($end_date)); ?></span>
+<?php if ($selected_branch_name): ?>
+    | الفرع: <span style="color: #28a745;"><?php echo htmlspecialchars($selected_branch_name); ?></span>
+<?php endif; ?>
 </p>
 </div>
 
